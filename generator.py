@@ -29,13 +29,12 @@ def get_generator(df: pd.DataFrame, data_type: str, list_classes: list, preproce
 
     df = df.copy(deep=True)
     if data_type == 'train':
-        data_generator = ImageDataGenerator(
-            preprocessing_function=preprocessing_function)  # Ajouter data augmentation ici si vous voulez
+        data_generator = ImageDataGenerator(preprocessing_function=preprocessing_function)
+        # Ajouter data augmentation ici si vous voulez
     else:
         data_generator = ImageDataGenerator(preprocessing_function=preprocessing_function)
 
     # Get generator
-    print("exemple of image path: ", df['file_path'].sample(1))
     shuffle = True if data_type == 'train' else False  # Attention, ne pas shuffle si valid/test !!!!
     if data_type != 'test':
         generator = data_generator.flow_from_dataframe(df, directory=None, x_col='file_path', y_col='file_class',

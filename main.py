@@ -14,29 +14,33 @@ from typing import Tuple, Any
 
 from generator import get_generator
 
-def load_data(csv_path : str, image_dir : str) -> Tuple[Any, Any, Any]:
+def get_classes_from_proba(predicted_proba, dict_classes):
+    predicted_class = np.vectorize(lambda x: dict_classes[x])(predicted_proba.argmax(axis=-1))
+    return predicted_class
+
+def load_data(csv_path : str, image_dir : str):
     df = pd.read_csv(csv_path, sep=',')
     df = df[['new_id', 'label']].rename(columns={'new_id': 'filename', 'label': 'file_class'})
     available_files = os.listdir(image_dir)
-    print(available_files)
+    print("number of available files:", len(available_files))
     df['file_path'] = df['filename'].apply(lambda x: os.path.join(image_dir, x))
     df['file_class'] = df['file_class'].apply(str)
 
     # Spécifique, on se limite à 3 types (Water, Fire & Grass)
     # df = df[df['file_class'].isin(['Water', 'Fire', 'Grass'])].reset_index(drop=True)
 
-    df_train, df_valid = train_test_split(df, test_size=0.2, stratify=df['file_class'])
-    return df_train, df_valid, df
+    return df
 
 
 def main():
     # On vérifie qu'on utilise bien un GPU :
     print(f"Utilisation GPU : {'OK' if len(tf.config.list_physical_devices('GPU')) > 0 else 'KO'}")
 
-    df_train, df_valid, df = load_data("./train_labels.csv", "./images/train/train/")
+    df_train = load_data("./train_labels.csv", "./images/train/train/")
+    df_valid = load_data("./sample_submission.csv", "./images/test/test/")
 
     # On récupère la liste des classes à prédire
-    list_classes = sorted(list(df['file_class'].unique()))
+    list_classes = sorted(list(df_train['file_class'].unique()))
     dict_classes = {i: v for i, v in enumerate(list_classes)}
     print("list_classes:", list_classes)
 
@@ -50,6 +54,7 @@ def main():
                                     width=width, height=height, batch_size=min(batch_size, len(df_valid)))
     learning_rate = 0.001  # TODO: à adapter à votre problème
 
+    print("Generator Done")
     # Get input/output dimensions
     input_shape = (width, height, 3)  # 3 car format rgb dans nos générateurs
     num_classes = len(list_classes)
@@ -58,10 +63,8 @@ def main():
     input_layer = Input(shape=input_shape)
 
     # Feature extraction
-
     x = Conv2D(32, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(input_layer)
     x = MaxPooling2D(2, strides=2, padding='valid')(x)
-
     x = Conv2D(32, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(x)
     x = MaxPooling2D(2, strides=2, padding='valid')(x)
 
@@ -83,9 +86,23 @@ def main():
     # Compile model
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
 
-
     # Summary du modèle
     model.summary()
+
+    epochs = 100
+    patience = 10
+
+    # On train notre modèle (on y a ajoute un early stopping pour s'arrêter si plus de progression sur le jeu de valid)
+    fit_history = model.fit(
+        x=train_generator,
+        epochs=epochs,
+        callbacks=[EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)],
+        steps_per_epoch=len(df_train) // min(batch_size, len(df_train)),
+        validation_data=valid_generator,
+        validation_steps=len(df_valid) // min(batch_size, len(df_valid)),
+        verbose=1,
+        workers=8,
+    )
 
     # Pour la partie prédiction, on veut un générateur mais sans mélange, ni data augmentation, etc...
     # Pour ça, on utilise l'argument data_type à 'test' (cf. définition de la fonction get_generator)
@@ -93,10 +110,22 @@ def main():
                                                  width=width, height=height, batch_size=min(batch_size, len(df_train)))
     data_valid_to_test_generator = get_generator(df_valid, data_type='test', list_classes=None,
                                                  width=width, height=height, batch_size=min(batch_size, len(df_valid)))
+    print("======= Prediction =======")
     predicted_proba_on_train = model.predict(data_train_to_test_generator, workers=8, verbose=1)
+    train_classes = get_classes_from_proba(predicted_proba_on_train, dict_classes)
     predicted_proba_on_valid = model.predict(data_valid_to_test_generator, workers=8, verbose=1)
+    valid_classes = get_classes_from_proba(predicted_proba_on_valid, dict_classes)
     print(len(predicted_proba_on_train) == df_train.shape[0])
     print(len(predicted_proba_on_valid) == df_valid.shape[0])
+
+    print(valid_classes)
+    print("=== Submission ===")
+    print(len(valid_classes))
+    submission = pd.read_csv("./sample_submission.csv", encoding="UTF8", sep=",")
+    submission['label'] = valid_classes
+    print(submission)
+    submission.to_csv("submission.csv", encoding="utf8", sep=',', index=False)
+    # import pdb; pdb.set_trace()
 
 if __name__ == '__main__':
     main()
