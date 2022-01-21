@@ -2,6 +2,9 @@ import pandas as pd
 from tensorflow.keras.applications.imagenet_utils import preprocess_input
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
+import matplotlib.pyplot as plt
+
+
 def get_generator(df: pd.DataFrame, data_type: str, list_classes: list, preprocessing_function=preprocess_input,
                   width: int = 224, height: int = 224, batch_size: int = 64):
     """Function to get an image generator

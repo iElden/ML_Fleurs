@@ -18,7 +18,7 @@ def get_classes_from_proba(predicted_proba, dict_classes):
     predicted_class = np.vectorize(lambda x: dict_classes[x])(predicted_proba.argmax(axis=-1))
     return predicted_class
 
-def load_data(csv_path : str, image_dir : str):
+def load_data(csv_path : str, image_dir : str, split=False):
     df = pd.read_csv(csv_path, sep=',')
     df = df[['new_id', 'label']].rename(columns={'new_id': 'filename', 'label': 'file_class'})
     available_files = os.listdir(image_dir)
@@ -29,6 +29,8 @@ def load_data(csv_path : str, image_dir : str):
     # Spécifique, on se limite à 3 types (Water, Fire & Grass)
     # df = df[df['file_class'].isin(['Water', 'Fire', 'Grass'])].reset_index(drop=True)
 
+    if split:
+        return train_test_split(df, test_size=0.2, stratify=df['file_class'])
     return df
 
 
@@ -36,8 +38,8 @@ def main():
     # On vérifie qu'on utilise bien un GPU :
     print(f"Utilisation GPU : {'OK' if len(tf.config.list_physical_devices('GPU')) > 0 else 'KO'}")
 
-    df_train = load_data("./train_labels.csv", "./images/train/train/")
-    df_valid = load_data("./sample_submission.csv", "./images/test/test/")
+    df_train, df_valid = load_data("./train_labels.csv", "./images/train/train/", split=True)
+    df_submit = load_data("./sample_submission.csv", "./images/test/test/")
 
     # On récupère la liste des classes à prédire
     list_classes = sorted(list(df_train['file_class'].unique()))
@@ -50,7 +52,7 @@ def main():
     batch_size = 32
     train_generator = get_generator(df_train, data_type='train', list_classes=list_classes,
                                     width=width, height=height, batch_size=min(batch_size, len(df_train)))
-    valid_generator = get_generator(df_valid, data_type='valid', list_classes=list_classes,
+    valid_generator = get_generator(df_valid, data_type='test', list_classes=list_classes,
                                     width=width, height=height, batch_size=min(batch_size, len(df_valid)))
     learning_rate = 0.001  # TODO: à adapter à votre problème
 
@@ -99,7 +101,7 @@ def main():
         callbacks=[EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)],
         steps_per_epoch=len(df_train) // min(batch_size, len(df_train)),
         validation_data=valid_generator,
-        validation_steps=len(df_valid) // min(batch_size, len(df_valid)),
+        validation_steps=len(df_submit) // min(batch_size, len(df_submit)),
         verbose=1,
         workers=8,
     )
@@ -108,21 +110,21 @@ def main():
     # Pour ça, on utilise l'argument data_type à 'test' (cf. définition de la fonction get_generator)
     data_train_to_test_generator = get_generator(df_train, data_type='test', list_classes=None,
                                                  width=width, height=height, batch_size=min(batch_size, len(df_train)))
-    data_valid_to_test_generator = get_generator(df_valid, data_type='test', list_classes=None,
-                                                 width=width, height=height, batch_size=min(batch_size, len(df_valid)))
+    data_submit_to_test_generator = get_generator(df_submit, data_type='test', list_classes=None,
+                                                 width=width, height=height, batch_size=min(batch_size, len(df_submit)))
     print("======= Prediction =======")
     predicted_proba_on_train = model.predict(data_train_to_test_generator, workers=8, verbose=1)
     train_classes = get_classes_from_proba(predicted_proba_on_train, dict_classes)
-    predicted_proba_on_valid = model.predict(data_valid_to_test_generator, workers=8, verbose=1)
-    valid_classes = get_classes_from_proba(predicted_proba_on_valid, dict_classes)
+    predicted_proba_on_submit = model.predict(data_submit_to_test_generator, workers=8, verbose=1)
+    submit_classes = get_classes_from_proba(predicted_proba_on_submit, dict_classes)
     print(len(predicted_proba_on_train) == df_train.shape[0])
-    print(len(predicted_proba_on_valid) == df_valid.shape[0])
+    print(len(predicted_proba_on_submit) == df_submit.shape[0])
 
-    print(valid_classes)
+    print(submit_classes)
     print("=== Submission ===")
-    print(len(valid_classes))
+    print(len(submit_classes))
     submission = pd.read_csv("./sample_submission.csv", encoding="UTF8", sep=",")
-    submission['label'] = valid_classes
+    submission['label'] = submit_classes
     print(submission)
     submission.to_csv("submission.csv", encoding="utf8", sep=',', index=False)
     # import pdb; pdb.set_trace()
