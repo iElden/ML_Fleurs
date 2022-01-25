@@ -93,7 +93,7 @@ def main():
         callbacks=[EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)],
         steps_per_epoch=len(df_train) // min(batch_size, len(df_train)),
         validation_data=valid_generator,
-        validation_steps=len(df_submit) // min(batch_size, len(df_submit)),
+        validation_steps=len(df_valid) // min(batch_size, len(df_valid)),
         verbose=1,
         workers=8,
     )
