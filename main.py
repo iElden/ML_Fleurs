@@ -5,12 +5,10 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import (ELU, BatchNormalization, Dense, Dropout, SpatialDropout2D,
-                                     Input, LeakyReLU, ReLU, Conv2D, Flatten,
-                                     MaxPooling2D, AveragePooling2D,
-                                     GlobalMaxPooling2D, GlobalAveragePooling2D)
-from tensorflow.keras.optimizers import SGD, Adam
-from typing import Tuple, Any
+from tensorflow.keras.layers import (Dense, Input, Conv2D, Flatten,
+                                     MaxPooling2D, Dropout)
+from tensorflow.keras.layers.experimental.preprocessing import Rescaling
+from tensorflow.keras.optimizers import Adam
 
 from generator import get_generator
 
@@ -63,23 +61,17 @@ def main():
 
     # Input
     input_layer = Input(shape=input_shape)
-
-    # Feature extraction
-    x = Conv2D(32, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(input_layer)
-    x = MaxPooling2D(2, strides=2, padding='valid')(x)
+    x = Rescaling(1./255)(input_layer)
     x = Conv2D(32, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(x)
     x = MaxPooling2D(2, strides=2, padding='valid')(x)
+    x = Conv2D(64, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(x)
+    x = MaxPooling2D(2, strides=2, padding='valid')(x)
+    x = Conv2D(128, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(x)
+    x = MaxPooling2D(2, strides=2, padding='valid')(x)
 
-    # Flatten
     x = Flatten()(x)
-
-    # Classification
     x = Dense(256, activation='elu', kernel_initializer="he_uniform")(x)
-
-    # Last layer
     out = Dense(num_classes, activation='softmax', kernel_initializer='glorot_uniform')(x)
-
-    # Set model
     model = Model(inputs=input_layer, outputs=[out])
 
     # Set optimizer
