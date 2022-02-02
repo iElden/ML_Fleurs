@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Dense, Input, Conv2D, Flatten,
-                                     MaxPooling2D, Dropout)
+                                     MaxPooling2D, Dropout, BatchNormalization)
 from tensorflow.keras.layers.experimental.preprocessing import Rescaling, RandomFlip, RandomRotation
 from tensorflow.keras.optimizers import Adam
 
@@ -41,14 +41,14 @@ def main():
     print("list_classes:", list_classes)
 
     # On définit les générateurs
-    width = 64
-    height = 64
+    width = 224
+    height = 224
     batch_size = 32
     train_generator = get_generator(df_train, data_type='train', list_classes=list_classes,
                                     width=width, height=height, batch_size=min(batch_size, len(df_train)))
     valid_generator = get_generator(df_valid, data_type='valid', list_classes=list_classes,
                                     width=width, height=height, batch_size=min(batch_size, len(df_valid)))
-    learning_rate = 0.001
+    learning_rate = 0.000_5
 
     print("Generator Done")
     # Get input/output dimensions
@@ -66,8 +66,15 @@ def main():
     x = MaxPooling2D()(x)
     x = Conv2D(256, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(x)
     x = MaxPooling2D()(x)
+    x = Conv2D(512, 3, padding='same', activation='elu', kernel_initializer="he_uniform")(x)
+    x = MaxPooling2D()(x)
     x = Flatten()(x)
+    x = Dense(512, activation='elu', kernel_initializer="he_uniform")(x)
+    x = Dropout(0.2)(x)
+    x = BatchNormalization()(x)
     x = Dense(256, activation='elu', kernel_initializer="he_uniform")(x)
+    x = Dropout(0.2)(x)
+    x = BatchNormalization()(x)
     out = Dense(num_classes, activation='softmax', kernel_initializer='glorot_uniform')(x)
     model = Model(inputs=input_layer, outputs=[out])
 

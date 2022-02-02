@@ -26,7 +26,8 @@ def get_generator(df: pd.DataFrame, data_type: str, list_classes: list,
     """
     df = df.copy(deep=True)
     if data_type == 'train':
-        data_generator = ImageDataGenerator(preprocessing_function=preprocessing_function)
+        data_generator = ImageDataGenerator(preprocessing_function=preprocessing_function, horizontal_flip=True,
+                                            zoom_range=0.2, rotation_range=0.2)
         # Ajouter data augmentation ici si vous voulez
     else:
         data_generator = ImageDataGenerator(preprocessing_function=preprocessing_function)
