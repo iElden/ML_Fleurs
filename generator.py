@@ -5,8 +5,8 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 
 
-def get_generator(df: pd.DataFrame, data_type: str, list_classes: list, preprocessing_function=preprocess_input,
-                  width: int = 224, height: int = 224, batch_size: int = 64):
+def get_generator(df: pd.DataFrame, data_type: str, list_classes: list,
+                  width: int, height: int, batch_size: int, preprocessing_function=preprocess_input):
     """Function to get an image generator
 
     Args:
@@ -24,20 +24,12 @@ def get_generator(df: pd.DataFrame, data_type: str, list_classes: list, preproce
         height (int): hauteur de l'image une fois chargée
         batch_size (int): taille des batchs d'images générés par le generateur
     """
-
-    # TODO : changer le preprocessing si vous voulez
-    # TODO : changer la taille des images chargées si vous voulez
-    # TODO : ajouter du data augmentation si vous voulez
-    # Copy
-
     df = df.copy(deep=True)
     if data_type == 'train':
         data_generator = ImageDataGenerator(preprocessing_function=preprocessing_function)
         # Ajouter data augmentation ici si vous voulez
     else:
         data_generator = ImageDataGenerator(preprocessing_function=preprocessing_function)
-
-    # Get generator
     shuffle = True if data_type == 'train' else False  # Attention, ne pas shuffle si valid/test !!!!
     if data_type != 'test':
         generator = data_generator.flow_from_dataframe(df, directory=None, x_col='file_path', y_col='file_class',
@@ -45,8 +37,6 @@ def get_generator(df: pd.DataFrame, data_type: str, list_classes: list, preproce
                                                        target_size=(width, height), color_mode='rgb',
                                                        class_mode='categorical',
                                                        batch_size=batch_size, shuffle=shuffle, validate_filenames=False)
-    # Pour jeu de test, on va se créer un faux dataframe avec une classe unique
-    # L'idée est qu'on veut juste réappliquer le même preprocessing en entrée, on ne se sert pas de la classe puisqu'on veut juste faire une prédiction
     else:
         df['fake_class_col'] = 'all_classes'
         generator = data_generator.flow_from_dataframe(df, directory=None, x_col='file_path', y_col='fake_class_col',
